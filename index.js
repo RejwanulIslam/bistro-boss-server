@@ -3,6 +3,7 @@ const cors = require('cors')
 require('dotenv').config()
 const jwt = require('jsonwebtoken')
 const app = express()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 //midilware
@@ -29,6 +30,7 @@ async function run() {
         const menuCollection = client.db('bistroDB').collection('menu')
         const reviewsCollection = client.db('bistroDB').collection('reviews')
         const cartsCollection = client.db('bistroDB').collection('carts')
+        const paymentCollection = client.db('bistroDB').collection('payment')
 
         //jwt relate api
         app.post('/jwt', async (req, res) => {
@@ -186,6 +188,40 @@ async function run() {
             const result = await cartsCollection.deleteOne(query)
             res.send(result)
         })
+
+        //create payment intent
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body
+            const amount = parseInt(price * 100)
+            console.log(amount)
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ["card"],
+                // automatic_payment_methods: {
+                //     enabled: true
+                // }
+            })
+
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+
+        })
+
+        //save payment info
+        app.post('/payment', async (req, res) => {
+            const payment = req.body
+            const paymentResult = await paymentCollection.insertOne(payment)
+            const query = {
+                _id: {
+                    $in: payment.cartId.map(id => new ObjectId(id))
+                }
+            }
+            const deleteResult = await cartsCollection.deleteMany(query)
+            res.send({paymentResult,deleteResult})
+        })
+
 
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();

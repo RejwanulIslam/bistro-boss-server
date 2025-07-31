@@ -219,7 +219,17 @@ async function run() {
                 }
             }
             const deleteResult = await cartsCollection.deleteMany(query)
-            res.send({paymentResult,deleteResult})
+            res.send({ paymentResult, deleteResult })
+        })
+
+        app.get('/payment/:email', veryfyToken, async (req, res) => {
+            const email = req.params.email
+            if (email !== req.decoded.email) {
+                res.status(403).send({ message: 'forbiden access' })
+            }
+            const query = { email: email }
+            const result = await paymentCollection.find(query).toArray()
+            res.send(result)
         })
 
 
